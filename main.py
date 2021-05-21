@@ -59,6 +59,7 @@ draw.rectangle((0,0,width,height), outline=0, fill=0)
 padding = -2
 top = padding
 bottom = height-padding
+header_end = 9
 
 # Load default font.
 font = ImageFont.load_default()
@@ -74,13 +75,13 @@ radio_band_end = config["fmEnd"]
 
 # UI variables
 in_menu = False
-alarm_triggered = True
+alarm_triggered = False
 alarm_frame = 0
 alarm_frame_max = 28
 menu_index = 0
 menu_index_max = 0
 menu_title = ""
-menu_entry_height = 5
+menu_entry_height = 7
 mode = 0
 
 """
@@ -102,38 +103,46 @@ def draw_menu(title, entries, confirm_callback):
 	global menu_index
 
 	entries_count = len(entries)
-	pages = int(math.ceil(entries_count / 4))
+	pages = int(math.ceil(entries_count / 3))
 
 	menu_index_max = entries_count
 
-	current_page = int(math.ceil(menu_index / 4))
+	current_page = int(menu_index / 3)
+
+	print("Page: %d" % current_page)
 
 	scrollbar_height = height / pages
-	scrollbar_y = current_page * scrollbar_height
+	scrollbar_y = header_end + current_page * scrollbar_height
 
 	# Scrollbar
-	draw.line((width-2, scrollbar_y, width, scrollbar_y + scrollbar_height), fill=255)
+	draw.rectangle((width-5, scrollbar_y, width, scrollbar_y + scrollbar_height), fill=255)
 
 	#print("pages: %d current_page: %d scrollbar_height: %d scrollbar_y: %d" % (pages, current_page, scrollbar_height, scrollbar_y))
 
 	# Entries
-	for i in range(4):
+	for i in range(3):
 		try:
-			draw.text((10, i*menu_entry_height), entries[current_page*4:current_page*4+4][i], font=font, fill=255)
+			draw.text((10, header_end + i*menu_entry_height), entries[current_page*3:current_page*3+3][i], font=font, fill=255)
 		except:
 			pass
 
-	if GPIO.input(config["pins"]["up"]) == GPIO.HIGH:
-		if menu_index > 0 and menu_index < menu_index_max:
-			menu_index -= 1
-		else:
-			menu_index = menu_index_max
+	# Selected indicator
+	print("Y: %d" % ((menu_index - (current_page * 3)) * menu_entry_height + 3))
+	draw.rectangle((2, header_end + (menu_index - (current_page * 3)) * menu_entry_height + 3, 4, header_end + (menu_index - (current_page * 3)) * menu_entry_height + 3 + 5), fill=255)
 
-	if GPIO.input(config["pins"]["down"]) == GPIO.HIGH:
-		if menu_index > 0 and menu_index < menu_index_max:
+	if GPIO.input(config["pins"]["up"]) == GPIO.HIGH:
+		if menu_index >= 0 and menu_index < menu_index_max+1:
 			menu_index += 1
+			print("Up: %d" % menu_index)
 		else:
 			menu_index = 0
+
+	if GPIO.input(config["pins"]["down"]) == GPIO.HIGH:
+		if menu_index > 0 and menu_index < menu_index_max+1:
+			menu_index -= 1
+			print("Down: %d" % menu_index)
+		else:
+			menu_index = menu_index_max
 
 	if GPIO.input(config["pins"]["confirm"]) == GPIO.HIGH:
 		if confirm_callback != None:
@@ -142,7 +151,7 @@ def draw_menu(title, entries, confirm_callback):
 
 def draw_radio(frequency, stereo):
 	# Menu title
-	draw.text(((width - 8*len(menu_title)) / 2, top), "Radio", font=font, fill=255)
+	draw.text(((width - 8*len("Radio")) / 2, top), "Radio", font=font, fill=255)
 
 	# Frequency
 	draw.text(((width - 8*len("%shz" % frequency)) / 2, height/2-5), "%shz" % frequency, font=font, fill=255)
@@ -160,9 +169,11 @@ def draw_radio(frequency, stereo):
 	draw.rectangle((needleX, 32, needleX+1, 22), fill=255)
 
 def draw_alarm():
+	global alarm_frame
+
 	# Animation
-	frame = Image.open('animations/alarm/%s.png' % alarm_frame).resize((20, 20), Image.ANTIALIAS).convert('1')
-	image.paste(frame, ((width - 20) / 2, (height - 20) / 2))
+	frame = Image.open('animations/alarm/frame-%s.png' % alarm_frame).resize((20, 20), Image.ANTIALIAS).convert('1')
+	image.paste(frame, (10, 10))
 	if alarm_frame >= alarm_frame_max:
 		alarm_frame = 0
 
@@ -179,37 +190,37 @@ while True:
 	# Draw a black filled box to clear the image.
 	draw.rectangle((0,0,width,height), outline=0, fill=0)
 
-	draw_header()
+	if not alarm_triggered:
+		draw_header()
 
-	if mode == 0:
-		entries = [
-			"Radio",
-			"Media",
-			"Settings",
-			"Info"
-		]
+		if mode == 0:
+			entries = [
+				"Radio",
+				"Media",
+				"Settings",
+				"Info"
+			]
 
-		draw_menu("Mode", entries, home_mode_select_callback)
+			draw_menu("Mode", entries, home_mode_select_callback)
 
-	elif mode == 1 and not in_menu:
-		draw_radio(radio_frequency, True)
+		elif mode == 1 and not in_menu:
+			draw_radio(radio_frequency, True)
 
-		if GPIO.input(config["pins"]["down"]) == GPIO.HIGH:
-			if radio_frequency <= radio_band_end and radio_frequency >= radio_band_start:
-				radio_frequency -= .5
-			else:
-				radio_frequency=radio_band_end
+			if GPIO.input(config["pins"]["down"]) == GPIO.HIGH:
+				if radio_frequency <= radio_band_end and radio_frequency >= radio_band_start:
+					radio_frequency -= .5
+				else:
+					radio_frequency=radio_band_end
 
-		if GPIO.input(config["pins"]["up"]) == GPIO.HIGH:
-                	if radio_frequency <= radio_band_end and radio_frequency >= radio_band_start:
-                        	radio_frequency += .5
-                	else:
-                        	radio_frequency=radio_band_start
+			if GPIO.input(config["pins"]["up"]) == GPIO.HIGH:
+				if radio_frequency <= radio_band_end and radio_frequency >= radio_band_start:
+                        		radio_frequency += .5
+				else:
+					radio_frequency=radio_band_start
+		elif mode == 2 and not in_menu:
+			draw_media_player()
 
-	elif mode == 2 and not in_menu:
-		draw_media_player()
-
-	if alarm_triggered:
+	else:
 		draw_alarm()
 
 	# Display image.
