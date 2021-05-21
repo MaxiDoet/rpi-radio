@@ -179,13 +179,15 @@ def draw_alarm():
 	global alarm_frame
 
 	# Animation
-	frame = Image.open('animations/alarm/frame-%s.png' % alarm_frame).resize((20, 20), Image.ANTIALIAS).convert('1')
-	image.paste(frame, (10, 10))
+	frame = Image.open('animations/alarm/frame-%s.png' % alarm_frame).resize((50, 30), Image.ANTIALIAS).convert('1')
+	image.paste(frame, (int((width - 50) / 2), int((height - 30) / 2) - 5))
 	if alarm_frame >= alarm_frame_max:
 		alarm_frame = 0
 
+	alarm_frame += 1
+
 	# Clock
-	draw.text(((width - 8*len(utils.get_time())) / 2, height/2+5), utils.get_time(), font=font, fill=255)
+	draw.text(((width - 30) / 2, height/2+7), utils.get_time(), font=font, fill=255)
 
 def home_mode_select_callback(index):
 	global mode
