@@ -2,6 +2,7 @@ import RPi.GPIO as GPIO
 import json
 from log import *
 import time
+import math
 import subprocess
 
 import Adafruit_GPIO.SPI as SPI
@@ -24,12 +25,6 @@ except:
 GPIO.setwarnings(False)
 GPIO.setmode(GPIO.BCM)
 
-# Menu variables
-in_menu = True
-menu_index = 0
-menu_index_max = 1
-menu_title = "Radio"
-
 # Up Button
 GPIO.setup(config["pins"]["up"], GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 # Down Button
@@ -45,25 +40,6 @@ disp.display()
 
 width = disp.width
 height = disp.height
-
-def button_up_event(channel):
-	debug("button up event")
-	if in_menu:
-		if menu_index is 0:
-			menu_index = menu_index_max
-		else:
-			menu_index -= 1
-
-def button_down_event(channel):
-	debug("button down event")
-	if in_menu:
-		if menu_index is menu_index_max:
-			menu_index = 0
-		else:
-			menu_index += 1
-
-def button_confirm_event(channel):
-	debug("button confirm event")
 
 #GPIO.add_event_detect(config["pins"]["up"],GPIO.RISING,callback=button_up_event)
 #GPIO.add_event_detect(config["pins"]["down"],GPIO.RISING,callback=button_down_event)
@@ -90,11 +66,71 @@ font = ImageFont.load_default()
 # Some other nice fonts to try: http://www.dafont.com/bitmap.php
 # font = ImageFont.truetype('Minecraftia.ttf', 8)
 
+# Radio variables
 radio_frequency = 100
+radio_band_start = config["fmStart"]
+radio_band_end = config["fmEnd"]
 
-def draw_screen_radio(frequency):
+# UI variables
+in_menu = False
+menu_index = 0
+menu_index_max = 0
+menu_title = ""
+menu_entry_height = 5
+mode = 0
+
+"""
+Modes:
+	0 Home
+	1 Radio
+	2 Media player
+"""
+
+def draw_menu(title, entries, confirm_callback):
+	global menu_index
+
+	entries_count = len(entries)
+	pages = int(math.ceil(entries_count / 4))
+
+	menu_index_max = entries_count
+
+	current_page = int(math.ceil(menu_index / 4))
+
+	scrollbar_height = height / pages
+	scrollbar_y = current_page * scrollbar_height
+
+	# Scrollbar
+	draw.line((width-2, scrollbar_y, width, scrollbar_y + scrollbar_height), fill=255)
+
+	#print("pages: %d current_page: %d scrollbar_height: %d scrollbar_y: %d" % (pages, current_page, scrollbar_height, scrollbar_y))
+
+	# Entries
+	for i in range(4):
+		try:
+			draw.text((10, i*menu_entry_height), entries[current_page*4:current_page*4+4][i], font=font, fill=255)
+		except:
+			pass
+
+	if GPIO.input(config["pins"]["up"]) == GPIO.HIGH:
+		if menu_index > 0 and menu_index < menu_index_max:
+			menu_index -= 1
+		else:
+			menu_index = menu_index_max
+
+	if GPIO.input(config["pins"]["down"]) == GPIO.HIGH:
+		if menu_index > 0 and menu_index < menu_index_max:
+			menu_index += 1
+		else:
+			menu_index = 0
+
+	if GPIO.input(config["pins"]["confirm"]) == GPIO.HIGH:
+		if confirm_callback != None:
+			confirm_callback(menu_index)
+			in_menu = False
+
+def draw_radio(frequency, stereo):
 	# Menu title
-	draw.text(((width - 8*len(menu_title)) / 2, top), menu_title, font=font, fill=255)
+	draw.text(((width - 8*len(menu_title)) / 2, top), "Radio", font=font, fill=255)
 
 	# Clock
 	draw.text(((width - 30), top), "13:54", font=font, fill=255)
@@ -106,31 +142,59 @@ def draw_screen_radio(frequency):
 	draw.text(((width - 8*len("%shz" % frequency)) / 2, height/2-5), "%shz" % frequency, font=font, fill=255)
 
 	# Stereo indicator
-	#stereo = Image.open('stereo.png').resize((10, 7), Image.ANTIALIAS).convert('1')
-	#image.paste(stereo, (0, 1))
-	draw.text((1, top), "S", font=font, fill=255)
+	if stereo:
+		draw.text((1, top), "S", font=font, fill=255)
 
 	# Band
 	band = Image.open('band.png').resize((128, 8), Image.ANTIALIAS).convert('1')
 	image.paste(band, (0, 32-8))
 
 	# Band Needle
-	needleX = (width / (108 - 87.5)) * (frequency - 87.5)
+	needleX = (width / (radio_band_end - radio_band_start)) * (frequency - radio_band_start)
 	draw.rectangle((needleX, 32, needleX+1, 22), fill=255)
+
+def home_mode_select_callback(index):
+	if index == 0:
+		mode = 1
+	elif index == 1:
+		mode = 2
+
+# Init
+mode = 0
 
 while True:
 	# Draw a black filled box to clear the image.
 	draw.rectangle((0,0,width,height), outline=0, fill=0)
 
-	draw_screen_radio(radio_frequency)
+	if mode == 0:
+		entries = [
+			"Radio",
+			"Media",
+			"Settings",
+			"Test"
+		]
+
+		draw_menu("Mode", entries, home_mode_select_callback)
+
+	elif mode == 1 and not in_menu:
+		draw_radio(radio_frequency, True)
+
+		if GPIO.input(config["pins"]["down"]) == GPIO.HIGH:
+			if radio_frequency <= radio_band_end and radio_frequency >= radio_band_start:
+				radio_frequency -= .5
+			else:
+				radio_frequency=radio_band_end
+
+		if GPIO.input(config["pins"]["up"]) == GPIO.HIGH:
+                	if radio_frequency <= radio_band_end and radio_frequency >= radio_band_start:
+                        	radio_frequency += .5
+                	else:
+                        	radio_frequency=radio_band_start
+
+	elif mode == 2 and not in_menu:
+		draw_media_player()
 
 	# Display image.
 	disp.image(image)
 	disp.display()
 	time.sleep(.1)
-
-	if GPIO.input(18) == GPIO.HIGH:
-		if radio_frequency <= 108 and radio_frequency >= 87.5:
-			radio_frequency += .5
-		else:
-			radio_frequency=87.5
