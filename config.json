@@ -2,7 +2,7 @@
 	"pins": {
 		"up": 23,
 		"down": 18,
-		"confirm": 12
+		"confirm": 24
 	},
 	"fmStart": 87.5,
 	"fmEnd": 108

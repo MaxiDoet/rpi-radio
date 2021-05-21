@@ -109,8 +109,6 @@ def draw_menu(title, entries, confirm_callback):
 
 	current_page = int(menu_index / 3)
 
-	print("Page: %d" % current_page)
-
 	scrollbar_height = height / pages
 	scrollbar_y = header_end + current_page * scrollbar_height
 
@@ -127,27 +125,22 @@ def draw_menu(title, entries, confirm_callback):
 			pass
 
 	# Selected indicator
-	print("Y: %d" % ((menu_index - (current_page * 3)) * menu_entry_height + 3))
 	draw.rectangle((2, header_end + (menu_index - (current_page * 3)) * menu_entry_height + 3, 4, header_end + (menu_index - (current_page * 3)) * menu_entry_height + 3 + 5), fill=255)
 
 	if GPIO.input(config["pins"]["up"]) == GPIO.HIGH:
 		if menu_index >= 0 and menu_index < menu_index_max+1:
 			menu_index += 1
-			print("Up: %d" % menu_index)
 		else:
 			menu_index = 0
 
 	if GPIO.input(config["pins"]["down"]) == GPIO.HIGH:
 		if menu_index > 0 and menu_index < menu_index_max+1:
 			menu_index -= 1
-			print("Down: %d" % menu_index)
 		else:
 			menu_index = menu_index_max
 
 	if GPIO.input(config["pins"]["confirm"]) == GPIO.HIGH:
-		if confirm_callback != None:
-			confirm_callback(menu_index)
-			in_menu = False
+		confirm_callback(menu_index)
 
 def draw_radio(frequency, stereo):
 	# Menu title
@@ -181,6 +174,8 @@ def draw_alarm():
 	draw.text(((width - 8*len(utils.get_time())) / 2, height/2+5), utils.get_time(), font=font, fill=255)
 
 def home_mode_select_callback(index):
+	global mode
+
 	if index == 0:
 		mode = 1
 	elif index == 1:
@@ -197,8 +192,7 @@ while True:
 			entries = [
 				"Radio",
 				"Media",
-				"Settings",
-				"Info"
+				"Shutdown"
 			]
 
 			draw_menu("Mode", entries, home_mode_select_callback)
@@ -218,7 +212,7 @@ while True:
 				else:
 					radio_frequency=radio_band_start
 		elif mode == 2 and not in_menu:
-			draw_media_player()
+			mode = 0
 
 	else:
 		draw_alarm()
