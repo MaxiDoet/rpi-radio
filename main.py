@@ -4,6 +4,7 @@ from log import *
 import time
 import math
 import subprocess
+import utils
 
 import Adafruit_GPIO.SPI as SPI
 import Adafruit_SSD1306
@@ -73,6 +74,9 @@ radio_band_end = config["fmEnd"]
 
 # UI variables
 in_menu = False
+alarm_triggered = True
+alarm_frame = 0
+alarm_frame_max = 28
 menu_index = 0
 menu_index_max = 0
 menu_title = ""
@@ -85,6 +89,14 @@ Modes:
 	1 Radio
 	2 Media player
 """
+
+def draw_header():
+	# Clock
+	draw.text(((width - 30), top), utils.get_time(), font=font, fill=255)
+
+	# Seperator
+	draw.line((0, 8, width, 8), fill=255)
+
 
 def draw_menu(title, entries, confirm_callback):
 	global menu_index
@@ -132,12 +144,6 @@ def draw_radio(frequency, stereo):
 	# Menu title
 	draw.text(((width - 8*len(menu_title)) / 2, top), "Radio", font=font, fill=255)
 
-	# Clock
-	draw.text(((width - 30), top), "13:54", font=font, fill=255)
-
-	# Seperator
-	draw.line((0, 8, width, 8), fill=255)
-
 	# Frequency
 	draw.text(((width - 8*len("%shz" % frequency)) / 2, height/2-5), "%shz" % frequency, font=font, fill=255)
 
@@ -146,12 +152,22 @@ def draw_radio(frequency, stereo):
 		draw.text((1, top), "S", font=font, fill=255)
 
 	# Band
-	band = Image.open('band.png').resize((128, 8), Image.ANTIALIAS).convert('1')
+	band = Image.open('images/band.png').resize((128, 8), Image.ANTIALIAS).convert('1')
 	image.paste(band, (0, 32-8))
 
 	# Band Needle
 	needleX = (width / (radio_band_end - radio_band_start)) * (frequency - radio_band_start)
 	draw.rectangle((needleX, 32, needleX+1, 22), fill=255)
+
+def draw_alarm():
+	# Animation
+	frame = Image.open('animations/alarm/%s.png' % alarm_frame).resize((20, 20), Image.ANTIALIAS).convert('1')
+	image.paste(frame, ((width - 20) / 2, (height - 20) / 2))
+	if alarm_frame >= alarm_frame_max:
+		alarm_frame = 0
+
+	# Clock
+	draw.text(((width - 8*len(utils.get_time())) / 2, height/2+5), utils.get_time(), font=font, fill=255)
 
 def home_mode_select_callback(index):
 	if index == 0:
@@ -159,19 +175,18 @@ def home_mode_select_callback(index):
 	elif index == 1:
 		mode = 2
 
-# Init
-mode = 0
-
 while True:
 	# Draw a black filled box to clear the image.
 	draw.rectangle((0,0,width,height), outline=0, fill=0)
+
+	draw_header()
 
 	if mode == 0:
 		entries = [
 			"Radio",
 			"Media",
 			"Settings",
-			"Test"
+			"Info"
 		]
 
 		draw_menu("Mode", entries, home_mode_select_callback)
@@ -193,6 +208,9 @@ while True:
 
 	elif mode == 2 and not in_menu:
 		draw_media_player()
+
+	if alarm_triggered:
+		draw_alarm()
 
 	# Display image.
 	disp.image(image)
