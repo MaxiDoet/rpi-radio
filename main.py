@@ -42,10 +42,6 @@ disp.display()
 width = disp.width
 height = disp.height
 
-#GPIO.add_event_detect(config["pins"]["up"],GPIO.RISING,callback=button_up_event)
-#GPIO.add_event_detect(config["pins"]["down"],GPIO.RISING,callback=button_down_event)
-#GPIO.add_event_detect(config["pins"]["confirm"],GPIO.RISING,callback=button_confirm_event)
-
 image = Image.new('1', (width, height))
 
 # Get drawing object to draw on image.
@@ -73,7 +69,7 @@ radio_frequency = 100
 radio_band_start = config["fmStart"]
 radio_band_end = config["fmEnd"]
 
-# UI variables
+# Variables
 in_menu = False
 alarm_triggered = False
 alarm_frame = 0
@@ -83,6 +79,9 @@ menu_index_max = 0
 menu_title = ""
 menu_entry_height = 7
 mode = 0
+sleep = False
+sleep_timer = config["sleep"]
+sleep_last = 0
 
 """
 Modes:
@@ -90,6 +89,15 @@ Modes:
 	1 Radio
 	2 Media player
 """
+
+def sleep_reset(channel):
+	global sleep_timer
+	sleep_timer = config["sleep"]
+	#sleep = False
+
+GPIO.add_event_detect(config["pins"]["up"],GPIO.RISING,callback=sleep_reset)
+GPIO.add_event_detect(config["pins"]["down"],GPIO.RISING,callback=sleep_reset)
+GPIO.add_event_detect(config["pins"]["confirm"],GPIO.RISING,callback=sleep_reset)
 
 def draw_header():
 	# Clock
@@ -128,18 +136,24 @@ def draw_menu(title, entries, confirm_callback):
 	draw.rectangle((2, header_end + (menu_index - (current_page * 3)) * menu_entry_height + 3, 4, header_end + (menu_index - (current_page * 3)) * menu_entry_height + 3 + 5), fill=255)
 
 	if GPIO.input(config["pins"]["up"]) == GPIO.HIGH:
+		sleep_timer = config["sleep"]
+
 		if menu_index >= 0 and menu_index < menu_index_max+1:
 			menu_index += 1
 		else:
 			menu_index = 0
 
 	if GPIO.input(config["pins"]["down"]) == GPIO.HIGH:
+		sleep_timer = config["sleep"]
+
 		if menu_index > 0 and menu_index < menu_index_max+1:
 			menu_index -= 1
 		else:
 			menu_index = menu_index_max
 
 	if GPIO.input(config["pins"]["confirm"]) == GPIO.HIGH:
+		sleep_timer = config["sleep"]
+
 		confirm_callback(menu_index)
 
 def draw_radio(frequency, stereo):
@@ -185,8 +199,15 @@ while True:
 	# Draw a black filled box to clear the image.
 	draw.rectangle((0,0,width,height), outline=0, fill=0)
 
-	if not alarm_triggered:
+	if sleep_timer <= 0:
+		sleep=True
+	else:
+		sleep=False
+
+	if not alarm_triggered and not sleep:
 		draw_header()
+
+		sleep_timer -= .1
 
 		if mode == 0:
 			entries = [
@@ -211,11 +232,14 @@ while True:
                         		radio_frequency += .5
 				else:
 					radio_frequency=radio_band_start
+
 		elif mode == 2 and not in_menu:
 			mode = 0
 
-	else:
+	elif alarm_triggered:
 		draw_alarm()
+	elif sleep:
+		pass
 
 	# Display image.
 	disp.image(image)
