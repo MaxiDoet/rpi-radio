@@ -109,7 +109,6 @@ def draw_header():
 	# Seperator
 	draw.line((0, 8, width, 8), fill=255)
 
-
 def draw_menu(title, entries, confirm_callback):
 	global menu_index
 
@@ -200,6 +199,21 @@ def home_mode_select_callback(index):
 		mode = 1
 	elif index == 1:
 		mode = 2
+
+# Draw welcome screen
+welcome_msg = "Welcome"
+tmp = ""
+for i in range(len(welcome_msg)):
+	draw.rectangle((0,0,width,height), outline=0, fill=0)
+
+	tmp = tmp + welcome_msg[i]
+	draw.text(((width - 8*len(tmp)) / 2, height / 2), tmp, font=font, fill=255)
+
+	disp.image(image)
+	disp.display()
+	time.sleep(.1)
+
+time.sleep(1)
 
 while True:
 	# Draw a black filled box to clear the image.
