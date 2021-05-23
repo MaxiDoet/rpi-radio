@@ -83,6 +83,9 @@ sleep = False
 sleep_timer = config["sleep"]
 sleep_last = 0
 
+confirm_last = GPIO.LOW
+confirm_pressed = 0
+
 """
 Modes:
 	0 Home
@@ -151,10 +154,11 @@ def draw_menu(title, entries, confirm_callback):
 		else:
 			menu_index = menu_index_max
 
-	if GPIO.input(config["pins"]["confirm"]) == GPIO.HIGH:
+	if GPIO.input(config["pins"]["confirm"]) == GPIO.HIGH and confirm_last != GPIO.HIGH:
 		sleep_timer = config["sleep"]
 
-		confirm_callback(menu_index)
+		if (confirm_callback != None):
+			confirm_callback(menu_index)
 
 def draw_radio(frequency, stereo):
 	# Menu title
@@ -201,10 +205,21 @@ while True:
 	# Draw a black filled box to clear the image.
 	draw.rectangle((0,0,width,height), outline=0, fill=0)
 
+	confirm_state = GPIO.input(config["pins"]["confirm"])
+
 	if sleep_timer <= 0:
 		sleep=True
 	else:
 		sleep=False
+
+	if GPIO.input(config["pins"]["confirm"]) == GPIO.HIGH:
+		confirm_pressed +=1
+
+		if confirm_pressed == 10:
+			time.sleep(.1)
+			mode = 0
+	else:
+		confirm_pressed = 0
 
 	if not alarm_triggered and not sleep:
 		draw_header()
@@ -247,3 +262,5 @@ while True:
 	disp.image(image)
 	disp.display()
 	time.sleep(.1)
+
+	confirm_last = confirm_state
